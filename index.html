@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BrandLens</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: top nav with five pages (Home, Bots, Sentiment, Drift, Explain), one focused topic per page. Light theme only. */
+:root {
+  color-scheme: light;
+  --bg: #f3f5f6;
+  --surface: #ffffff;
+  --surface-2: #eaeef0;
+  --line: #d5dce0;
+  --fg: #15222a;
+  --muted: #5a6b75;
+  --accent: #0e6e73;
+  --accent-fg: #ffffff;
+  --accent-soft: #d9eeee;
+  --pos: #2f7d4f;
+  --neu: #7b8a94;
+  --neg: #c4452f;
+  --warn-bg: #fbe9e4;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-block: 20px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 20px; font-weight: 600; }
+p { margin: 0; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+nav { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: 12px; overflow-x: auto; }
+nav .brand { font-family: var(--font-display); font-weight: 700; font-size: 18px; margin-right: 14px; white-space: nowrap; color: var(--accent); }
+nav a { color: var(--muted); text-decoration: none; font-weight: 500; padding: 7px 12px; border-radius: 6px; white-space: nowrap; }
+nav a:hover { background: var(--surface-2); color: var(--fg); }
+nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+.page { display: flex; flex-direction: column; gap: 20px; }
+.intro { display: flex; flex-direction: column; gap: 8px; }
+.intro p { max-width: 65ch; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+.controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-top: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 200px; }
+select { font: inherit; color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; width: 100%; }
+.btn { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 6px; padding: 11px 22px; cursor: pointer; min-width: 170px; text-decoration: none; display: inline-block; text-align: center; }
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:disabled { opacity: 0.6; cursor: progress; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); min-width: 0; padding: 9px 16px; }
+.note { font-size: 13px; color: var(--muted); margin-top: 14px; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.step { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.step .tag { font-size: 11px; font-family: var(--font-mono); color: var(--muted); }
+.step b { font-family: var(--font-display); font-weight: 600; font-size: 14px; }
+.step small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.step[data-state="active"] { border-color: var(--accent); background: var(--accent-soft); }
+.step[data-state="active"] .tag { color: var(--accent); }
+.step[data-state="done"] { border-color: var(--pos); }
+.step[data-state="done"] .tag { color: var(--pos); }
+@media (max-width: 640px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+.tile .big { font-family: var(--font-display); font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tile .sub { font-size: 13px; color: var(--muted); }
+.links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+.bars { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+.bar-row { display: flex; flex-direction: column; gap: 5px; }
+.bar-row .name { font-size: 13px; color: var(--muted); }
+.stack { display: flex; height: 22px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+.stack span { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; margin-top: 12px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+.hbar { display: grid; grid-template-columns: 130px minmax(0, 1fr) 48px; gap: 10px; align-items: center; font-size: 13px; }
+.hbar .track { height: 14px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.hbar .track i { display: block; height: 100%; background: var(--accent); }
+.hbar .track i.neg { background: var(--neg); }
+@media (max-width: 480px) { .hbar { grid-template-columns: 96px minmax(0, 1fr) 42px; } }
+
+.alert { background: var(--warn-bg); border: 1px solid var(--neg); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
+.chart { margin-top: 14px; width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-family: var(--font-body); font-size: 11px; }
+
+.shap { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.shap-row { display: grid; grid-template-columns: 80px minmax(0, 1fr) 52px; gap: 10px; align-items: center; font-size: 13px; }
+.shap-track { position: relative; height: 16px; background: var(--surface-2); border-radius: 3px; }
+.shap-track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.shap-track::after { content: ""; position: absolute; left: 33%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+
+.table-wrap { overflow-x: auto; margin-top: 14px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 560px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; white-space: nowrap; }
+.pill.bot, .pill.neg { color: var(--neg); }
+.pill.human, .pill.pos { color: var(--pos); }
+.pill.neu { color: var(--neu); }
+.empty { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 36px 20px; }
+footer { font-size: 12.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav aria-label="Pages">
+    <span class="brand">BrandLens</span>
+    <a href="#home">Home</a>
+    <a href="#bots">Bots</a>
+    <a href="#sentiment">Sentiment</a>
+    <a href="#drift">Drift</a>
+    <a href="#explain">Explain</a>
+  </nav>
+
+  <!-- HOME -->
+  <main class="page" id="page-home">
+    <div class="intro">
+      <span class="label">Brand sentiment monitoring</span>
+      <h1>Run the pipeline</h1>
+      <p>Filter bot activity, classify sentiment, watch for drift over time and see which words drove each prediction. Press the button to run all four stages on a sample brand dataset, then open each result page.</p>
+    </div>
+
+    <section class="panel">
+      <span class="label">Run configuration</span>
+      <div class="controls">
+        <div class="field">
+          <label for="brand" class="muted" style="font-size:13px">Brand dataset</label>
+          <select id="brand"><option>Sample brand: online retail, 20 weeks</option></select>
+        </div>
+        <button id="run" class="btn" type="button">Analyze sentiment</button>
+      </div>
+      <p class="note">Runs in your browser on built-in sample data. No posts are fetched and nothing is sent anywhere.</p>
+    </section>
+
+    <ol class="steps" id="steps">
+      <li class="step" data-state="idle"><span class="tag">STAGE 1</span><b>Bot filtering</b><small>Random Forest flags suspicious accounts</small></li>
+      <li class="step" data-state="idle"><span class="tag">STAGE 2</span><b>Sentiment</b><small>TF-IDF + Logistic Regression, DistilBERT</small></li>
+      <li class="step" data-state="idle"><span class="tag">STAGE 3</span><b>Drift detection</b><small>Rolling-window Z-score on weekly share</small></li>
+      <li class="step" data-state="idle"><span class="tag">STAGE 4</span><b>SHAP explanation</b><small>Words that pushed each prediction</small></li>
+    </ol>
+
+    <section id="summary" hidden>
+      <div class="tiles" id="tiles"></div>
+      <div class="links">
+        <a class="btn ghost" href="#bots">Bot filtering</a>
+        <a class="btn ghost" href="#sentiment">Sentiment</a>
+        <a class="btn ghost" href="#drift">Drift alerts</a>
+        <a class="btn ghost" href="#explain">Explanations</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- BOTS -->
+  <main class="page" id="page-bots" hidden>
+    <div class="intro">
+      <span class="label">Stage 1</span>
+      <h1>Bot filtering</h1>
+      <p>Accounts with a bot score of 0.50 or higher are treated as suspicious and left out of the sentiment counts. The score is an estimate, so a flagged account is not proof of automation.</p>
+    </div>
+    <div data-needs-run>
+      <div class="panel">
+        <h2>What the bot detector looks at</h2>
+        <p class="muted" style="font-size:13px;margin-top:4px">Feature importance in the Random Forest (sample values)</p>
+        <div class="bars" id="features"></div>
+      </div>
+    </div>
+    <div data-needs-run>
+      <div class="panel">
+        <h2>Sample posts</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Account</th><th>Post</th><th>Bot score</th><th>Verdict</th></tr></thead>
+            <tbody id="posts"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SENTIMENT -->
+  <main class="page" id="page-sentiment" hidden>
+    <div class="intro">
+      <span class="label">Stage 2</span>
+      <h1>Sentiment</h1>
+      <p>Each remaining post is labelled positive, neutral or negative. Comparing the same weeks with and without bot content shows how much automated posts distort the picture.</p>
+    </div>
+    <div data-needs-run>
+      <div class="panel">
+        <h2>Sentiment distribution</h2>
+        <p class="muted" style="font-size:13px;margin-top:4px">Last 4 weeks</p>
+        <div class="bars" id="bars"></div>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--pos)"></i>Positive</span>
+          <span><i class="dot" style="background:var(--neu)"></i>Neutral</span>
+          <span><i class="dot" style="background:var(--neg)"></i>Negative</span>
+        </div>
+      </div>
+    </div>
+    <div data-needs-run>
+      <div class="panel">
+        <h2>What negative posts are about</h2>
+        <p class="muted" style="font-size:13px;margin-top:4px">Share of negative posts by topic, bots removed (sample values)</p>
+        <div class="bars" id="aspects"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- DRIFT -->
+  <main class="page" id="page-drift" hidden>
+    <div class="intro">
+      <span class="label">Stage 3</span>
+      <h1>Sentiment drift</h1>
+      <p>An alert fires when the weekly negative share sits more than 3 standard deviations above its recent normal. An alert is a prompt to investigate, not proof of a crisis.</p>
+    </div>
+    <div data-needs-run>
+      <div class="panel">
+        <h2>Weekly negative posts</h2>
+        <div id="alertbox"></div>
+        <svg class="chart" id="chart" viewBox="0 0 700 280" role="img" aria-label="Line chart of weekly negative post share, unfiltered versus bots removed"></svg>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--neg)"></i>Unfiltered (bots included)</span>
+          <span><i class="dot" style="background:var(--accent)"></i>Bots removed</span>
+          <span><i class="dot" style="background:var(--neg);border-radius:50%"></i>Drift alert</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- EXPLAIN -->
+  <main class="page" id="page-explain" hidden>
+    <div class="intro">
+      <span class="label">Stage 4</span>
+      <h1>Why this prediction?</h1>
+      <p>SHAP values show how much each word pushed one post toward or away from its predicted label.</p>
+    </div>
+    <div data-needs-run>
+      <div class="panel">
+        <h2>Explained post</h2>
+        <p style="margin-top:8px">“terrible late refund, package order”</p>
+        <p class="muted" style="font-size:13px;margin-top:4px">Predicted <span class="pill neg">negative</span> with 97% confidence</p>
+        <div class="shap" id="shap"></div>
+        <p class="muted" style="font-size:12.5px;margin-top:12px">Bars to the right push toward negative. Bars to the left push away from it.</p>
+      </div>
+    </div>
+  </main>
+
+  <div class="panel empty" id="gate" hidden>
+    <h2>Run the analysis first</h2>
+    <p class="muted">Results on this page appear after you run the pipeline from Home.</p>
+    <a class="btn" href="#home">Go to Home</a>
+  </div>
+
+  <footer>Sample data generated for demonstration. Figures show how the interface behaves and are not results from real social media posts.</footer>
+</div>
+
+<script>
+(function () {
+  var NEG_UNFILTERED = [10,11,8,9,11,10,13,11,7,9,14,12,11,13,58,57,54,50,50,50];
+  var NEG_FILTERED   = [11,12,9,10,11,10.5,13,12,8,9.5,14,12.5,12,14,13.5,13.5,12.5,9.5,9.5,12.5];
+  var POSTS = [
+    { acct: "@dailydeals_4491", text: "WORST brand ever!!! don't buy, link in bio http://bit.ly/x", bot: 0.96 },
+    { acct: "@promo_wave22",    text: "WORST brand ever!!! don't buy, link in bio http://bit.ly/y", bot: 0.94 },
+    { acct: "@meera_k",         text: "Terrible late refund, package arrived damaged. Still waiting.", bot: 0.07 },
+    { acct: "@rohan.designs",   text: "Quick delivery and the fabric feels great for the price.", bot: 0.05 },
+    { acct: "@ankit_s",         text: "Ordered the grey one on Tuesday. Nothing to add yet.", bot: 0.11 }
+  ];
+  var FEATURES = [["Followers", 0.30], ["Account age", 0.23], ["Posts per day", 0.16], ["Follower / following", 0.09], ["Total posts", 0.07], ["Following", 0.05], ["Duplicate posts", 0.04], ["Hashtag rate", 0.03], ["URL rate", 0.03]];
+  var ASPECTS = [["Delivery", 34], ["Refunds", 27], ["Product quality", 22], ["Customer service", 17]];
+  var SHAP = [{ w: "refund", v: 0.30 }, { w: "late", v: 0.22 }, { w: "terrible", v: 0.20 }, { w: "package", v: -0.08 }, { w: "order", v: -0.12 }];
+  var DIST = { "Unfiltered": [44, 14, 42], "Bots removed": [68, 19, 13] };
+
+  function mean(a) { return a.reduce(function (s, x) { return s + x; }, 0) / a.length; }
+  function std(a) { var m = mean(a); return Math.sqrt(mean(a.map(function (x) { return (x - m) * (x - m); }))); }
+  // Rolling-window Z-score. Flagged weeks stay out of the baseline until a shift lasts 5 weeks, then it becomes the new normal.
+  function detectDrift(series) {
+    var MIN = 6, WINDOW = 8, THRESH = 3, REBASE = 5;
+    var hist = [], streak = [], flags = [], zs = [];
+    series.forEach(function (v) {
+      if (hist.length < MIN) { hist.push(v); flags.push(false); zs.push(null); return; }
+      var base = hist.slice(-WINDOW);
+      var z = (v - mean(base)) / Math.max(std(base), 1.5);
+      zs.push(z);
+      if (z > THRESH) {
+        streak.push(v); flags.push(true);
+        if (streak.length >= REBASE) { hist = streak.slice(); streak = []; }
+      } else { streak = []; hist.push(v); flags.push(false); }
+    });
+    return { flags: flags, z: zs };
+  }
+
+  function el(id) { return document.getElementById(id); }
+  function fmt(n) { return n.toLocaleString("en-IN"); }
+  var hasRun = false;
+
+  function renderTiles(d) {
+    var peak = Math.max.apply(null, d.z.filter(function (x) { return x !== null; }));
+    var t = [
+      ["Posts analysed", fmt(12480), "sample dataset, 20 weeks"],
+      ["Bot content removed", "11.6%", fmt(1448) + " posts from 212 accounts"],
+      ["Drift alerts (unfiltered)", String(d.flags.filter(Boolean).length), "peak Z-score " + peak.toFixed(1)],
+      ["Drift alerts (bots removed)", "0", "no false alarm"]
+    ];
+    el("tiles").innerHTML = t.map(function (x) {
+      return '<div class="tile"><span class="label">' + x[0] + '</span><span class="big">' + x[1] + '</span><span class="sub">' + x[2] + '</span></div>';
+    }).join("");
+  }
+  function renderFeatures() {
+    el("features").innerHTML = FEATURES.map(function (f) {
+      return '<div class="hbar"><span>' + f[0] + '</span><div class="track"><i style="width:' + (f[1] / 0.30 * 100) + '%"></i></div><span class="mono muted">' + f[1].toFixed(2) + '</span></div>';
+    }).join("");
+  }
+  function renderAspects() {
+    el("aspects").innerHTML = ASPECTS.map(function (a) {
+      return '<div class="hbar"><span>' + a[0] + '</span><div class="track"><i class="neg" style="width:' + (a[1] / 34 * 100) + '%"></i></div><span class="mono muted">' + a[1] + '%</span></div>';
+    }).join("");
+  }
+  function renderBars() {
+    el("bars").innerHTML = Object.keys(DIST).map(function (k) {
+      var d = DIST[k];
+      return '<div class="bar-row"><span class="name">' + k + '</span><div class="stack" role="img" aria-label="' + k + ': ' + d[0] + '% positive, ' + d[1] + '% neutral, ' + d[2] + '% negative">' +
+        '<span style="width:' + d[0] + '%;background:var(--pos)"></span><span style="width:' + d[1] + '%;background:var(--neu)"></span><span style="width:' + d[2] + '%;background:var(--neg)"></span></div>' +
+        '<span class="mono muted" style="font-size:12px">' + d[0] + '% / ' + d[1] + '% / ' + d[2] + '%</span></div>';
+    }).join("");
+  }
+  function renderShap() {
+    el("shap").innerHTML = SHAP.map(function (s) {
+      var w = Math.abs(s.v) * (67 / 0.30);
+      var style = s.v >= 0 ? "left:33%;width:" + w + "%;background:var(--neg)" : "left:" + (33 - w) + "%;width:" + w + "%;background:var(--accent)";
+      return '<div class="shap-row"><span class="mono">' + s.w + '</span><div class="shap-track"><i style="' + style + '"></i></div><span class="mono muted">' + (s.v > 0 ? "+" : "") + s.v.toFixed(2) + '</span></div>';
+    }).join("");
+  }
+  function renderChart(d) {
+    var W = 700, H = 280, L = 44, R = 16, T = 14, B = 34;
+    var pw = W - L - R, ph = H - T - B, n = NEG_UNFILTERED.length;
+    var x = function (i) { return L + (i / (n - 1)) * pw; };
+    var y = function (v) { return T + ph - (v / 60) * ph; };
+    var s = "";
+    [0, 20, 40, 60].forEach(function (t) {
+      s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(t) + '" y2="' + y(t) + '" stroke="var(--line)" stroke-width="1"/>';
+      s += '<text x="' + (L - 8) + '" y="' + (y(t) + 4) + '" text-anchor="end">' + t + '%</text>';
+    });
+    [1, 5, 10, 15, 20].forEach(function (w) { s += '<text x="' + x(w - 1) + '" y="' + (H - 12) + '" text-anchor="middle">Wk ' + w + '</text>'; });
+    s += '<line x1="' + x(14) + '" x2="' + x(14) + '" y1="' + T + '" y2="' + (T + ph) + '" stroke="var(--muted)" stroke-dasharray="4 4"/>';
+    s += '<text x="' + (x(14) - 6) + '" y="' + (T + 11) + '" text-anchor="end">bot flood starts</text>';
+    function path(a) { return a.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); }).join(" "); }
+    s += '<path d="' + path(NEG_FILTERED) + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>';
+    s += '<path d="' + path(NEG_UNFILTERED) + '" fill="none" stroke="var(--neg)" stroke-width="2.5" stroke-linejoin="round"/>';
+    d.flags.forEach(function (f, i) { if (f) s += '<circle cx="' + x(i) + '" cy="' + y(NEG_UNFILTERED[i]) + '" r="4.5" fill="var(--neg)" stroke="var(--surface)" stroke-width="1.5"/>'; });
+    el("chart").innerHTML = s;
+  }
+  function renderAlert(d) {
+    var idx = [];
+    d.flags.forEach(function (f, i) { if (f) idx.push(i + 1); });
+    el("alertbox").innerHTML = '<div class="alert"><b>Drift alert, weeks ' + idx[0] + ' to ' + idx[idx.length - 1] + ' (unfiltered)</b>' +
+      '<span class="muted" style="font-size:13.5px">Negative share jumped from about 11% to ' + NEG_UNFILTERED[14] + '%. Most of the extra posts come from flagged bot accounts. With bots removed the share stays near 12% and no alert fires.</span></div>';
+  }
+  function renderPosts() {
+    el("posts").innerHTML = POSTS.map(function (p) {
+      var isBot = p.bot >= 0.5;
+      return '<tr><td class="mono">' + p.acct + '</td><td>' + p.text + '</td><td class="num">' + p.bot.toFixed(2) + '</td>' +
+        '<td><span class="pill ' + (isBot ? "bot" : "human") + '">' + (isBot ? "suspicious, excluded" : "likely human") + '</span></td></tr>';
+    }).join("");
+  }
+
+  // Routing on the hash
+  var ROUTES = ["home", "bots", "sentiment", "drift", "explain"];
+  function route() {
+    var h = (location.hash || "#home").slice(1);
+    if (ROUTES.indexOf(h) < 0) h = "home";
+    ROUTES.forEach(function (r) { el("page-" + r).hidden = r !== h; });
+    document.querySelectorAll("nav a").forEach(function (a) {
+      if (a.getAttribute("href") === "#" + h) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    var gated = h !== "home" && !hasRun;
+    el("gate").hidden = !gated;
+    el("page-" + h).querySelectorAll("[data-needs-run]").forEach(function (n) { n.hidden = gated; });
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener("hashchange", route);
+
+  // Pipeline run
+  var steps = Array.prototype.slice.call(document.querySelectorAll("#steps .step"));
+  var btn = el("run");
+  var fast = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var delay = fast ? 80 : 650;
+  function setStates(active) {
+    steps.forEach(function (s, i) { s.dataset.state = i < active ? "done" : i === active ? "active" : "idle"; });
+  }
+  btn.addEventListener("click", function () {
+    btn.disabled = true; btn.textContent = "Running…";
+    el("summary").hidden = true;
+    setStates(0);
+    var i = 0;
+    var timer = setInterval(function () {
+      i++;
+      if (i < steps.length) { setStates(i); return; }
+      clearInterval(timer);
+      setStates(steps.length);
+      var d = detectDrift(NEG_UNFILTERED);
+      renderTiles(d); renderFeatures(); renderAspects(); renderBars(); renderShap(); renderChart(d); renderAlert(d); renderPosts();
+      hasRun = true;
+      el("summary").hidden = false;
+      btn.disabled = false; btn.textContent = "Run again";
+    }, delay);
+  });
+
+  route();
+})();
+</script>
+</body>
+</html>
